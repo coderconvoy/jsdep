@@ -113,6 +113,7 @@ func main() {
 	_rt := flag.String("r", "", "Root directory")
 	_s := flag.String("s", "", "Start File")
 	_hpath := flag.String("h", "", "html-path")
+	_w := flag.Bool("w", false, "Add html wrapper")
 
 	flag.Parse()
 
@@ -129,7 +130,16 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s", err)
 	}
+
+	if *_w {
+		fmt.Fprintln(os.Stdout, `<!DOCTYPE html><head><meta charset="utf-8"></head><body>`)
+	}
+
 	PrintHTML(os.Stdout, comp, *_hpath)
+
+	if *_w {
+		fmt.Fprintln(os.Stdout, `</body><\html>`)
+	}
 
 }
 

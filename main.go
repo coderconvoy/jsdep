@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"text/template"
 
 	"github.com/pkg/errors"
 )
@@ -45,15 +46,21 @@ func Print(dpl []dep) {
 	}
 }
 
-func PrintHTML(w io.Writer, dpl []dep, hpath string) {
+func HTMLString(dpl []dep, hpath string) string {
+	res := ""
 	for k := len(dpl) - 1; k >= 0; k-- {
 		v := dpl[k]
 		s := v.name
 		if !v.ex {
 			s = path.Join(hpath, v.name)
 		}
-		fmt.Fprintf(w, "<script src=\"%s\"></script>\n", s)
+		res += fmt.Sprintf("<script src=\"%s\"></script>\n", s)
 	}
+	return res
+}
+
+func PrintHTML(w io.Writer, dpl []dep, hpath string) {
+	w.Write([]byte(HTMLString(dpl, hpath)))
 }
 
 func getDeps(d dep, root string) (dep, error) {
@@ -114,8 +121,43 @@ func main() {
 	_s := flag.String("s", "", "Start File")
 	_hpath := flag.String("h", "", "html-path")
 	_w := flag.Bool("w", false, "Add html wrapper")
+	_tp := flag.String("tp", "", "templatefile")
 
 	flag.Parse()
+
+	if *_tp != "" {
+		//run template file
+		rt := *_rt
+		if rt == "" {
+			rt = path.Dir(*_tp)
+		}
+
+		t, err := template.New("bill").Funcs(template.FuncMap{
+			"jsdep": func(ss ...string) (string, error) {
+				comp, err := Dig(rt, ss...)
+				if err != nil {
+					return "", err
+				}
+
+				comp, err = sortDeps(comp)
+				if err != nil {
+					return "", err
+				}
+				return HTMLString(comp, *_hpath), nil
+			},
+		}).ParseFiles(*_tp)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = t.ExecuteTemplate(os.Stdout, path.Base(*_tp), nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		return
+	}
 
 	if *_s == "" {
 		log.Fatal("Needs a start file See --help")
